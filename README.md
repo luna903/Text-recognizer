@@ -9,7 +9,7 @@ Works on mobile (Android / iOS Safari) and desktop browsers.
 |---|---|
 | Camera | `navigator.mediaDevices.getUserMedia` |
 | OCR | `Tesseract.js v5` |
-| Barcode / QR | `BarcodeDetector` (native) + `jsQR` (fallback) |
+| Barcode / QR | `BarcodeDetector`  |
 | Storage | `IndexedDB` (ScannerDB → objectStore: scans) |
 | Offline | Service Worker (`sw.js`) with cache-first strategy |
 
@@ -22,8 +22,6 @@ receipt-scanner-pwa/
 ├── index.html      Main app (single file, no build step)
 ├── sw.js           Service Worker — offline caching
 ├── manifest.json   PWA manifest (icons, theme, display mode)
-├── icon-192.png    PWA icon 192×192
-├── icon-512.png    PWA icon 512×512
 └── README.md       This file
 ```
 
@@ -43,25 +41,6 @@ npx serve .
 # open http://localhost:3000
 ```
 
-### HTTPS for mobile testing (phone and PC on same Wi-Fi)
-
-```bash
-# 1. Find your PC's local IP (e.g. 192.168.1.5)
-#    Mac/Linux: ifconfig | grep "inet "
-#    Windows:   ipconfig  →  IPv4 Address
-
-# 2. Generate a trusted cert for that IP
-mkcert -install
-mkcert 192.168.1.5
-
-# 3. Serve with HTTPS
-npx serve . --ssl-cert 192.168.1.5.pem --ssl-key 192.168.1.5-key.pem
-
-# 4. Open on phone: https://192.168.1.5:3000
-```
-
----
-
 ## Config Parameters
 
 Edit the `CFG` object near the top of `index.html`:
@@ -74,10 +53,10 @@ const CFG = {
 
   psm:  '6',        // Tesseract Page Segmentation Mode
                     //  3 = fully automatic (default)
-                    //  6 = single uniform block of text  ← good for receipts
+                    //  6 = single uniform block of text 
                     // 11 = sparse text (scattered words)
 
-  facingMode: 'environment'  // rear camera (only option — flip removed)
+  facingMode: 'environment'  // rear camera
 };
 ```
 
@@ -124,14 +103,8 @@ Store    : scans
 |---|---|---|---|---|
 | Camera | ✅ | ✅ | ✅ | ✅ |
 | OCR (Tesseract.js) | ✅ | ✅ | ✅ | ✅ |
-| BarcodeDetector | ✅ | ❌ (jsQR fallback) | ❌ (jsQR fallback) | ✅ |
+| BarcodeDetector | ✅ | ❌ | ❌  | ✅ |
 | PWA install | ✅ | partial | partial | ✅ |
 | Service Worker | ✅ | ✅ | ✅ | ✅ |
 
 ---
-
-## Notes
-
-- Camera requires **HTTPS** or **localhost** (browser security restriction).
-- All data is stored **locally** — nothing is sent to any server.
-- To reset all scans: click **Clear All** in the history panel, or open DevTools → Application → IndexedDB → ScannerDB → scans → Clear.
