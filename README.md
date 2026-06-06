@@ -1,4 +1,4 @@
-# Receipt Scanner PWA
+# Receipt Scanner
 
 A Progressive Web App for scanning receipts and QR codes using OCR.  
 Works on mobile (Android / iOS Safari) and desktop browsers.
