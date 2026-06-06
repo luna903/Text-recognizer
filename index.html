@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#b8ff45">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Receipt Scanner</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:,">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0a;--bg2:#141414;--bg3:#1c1c1c;--line:#272727;
+  --text:#e8e8e8;--muted:#666;--accent:#b8ff45;--red:#ff4d4d;
+  --mono:'Space Mono',monospace;--head:'Syne',sans-serif;--r:10px
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font:13px var(--mono)}
+
+/* layout: desktop = 2 columns, mobile = tabs */
+#app{display:grid;grid-template-columns:1fr 1fr;height:100vh}
+
+/* mobile tab bar */
+#tabbar{display:none;position:fixed;bottom:0;left:0;right:0;height:56px;
+  background:var(--bg2);border-top:1px solid var(--line);z-index:100;grid-template-columns:1fr 1fr}
+#tabbar button{background:none;border:none;color:var(--muted);font:11px var(--mono);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer}
+#tabbar button.active{color:var(--accent)}
+#tabbar button svg{width:20px;height:20px;stroke:currentColor;fill:none}
+
+/* camera panel */
+#panel-camera{display:flex;flex-direction:column;border-right:1px solid var(--line);overflow:hidden}
+#video-wrap{flex:1;position:relative;background:#000;overflow:hidden;min-height:0}
+video{width:100%;height:100%;object-fit:cover;display:block}
+
+#scan-line{display:none;position:absolute;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  animation:scan 1.6s ease-in-out infinite}
+@keyframes scan{0%{top:0;opacity:1}100%{top:100%;opacity:0}}
+#scan-line.active{display:block}
+
+#no-camera{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:12px;color:var(--muted);
+  font-size:12px;text-align:center;background:var(--bg2)}
+#no-camera svg{width:48px;height:48px;stroke:var(--muted);fill:none;opacity:.4}
+#no-camera.hidden{display:none}
+
+#drop-zone{border:2px dashed var(--line);border-radius:var(--r);padding:14px;
+  margin:0 12px;text-align:center;color:var(--muted);font-size:11px;cursor:pointer;
+  transition:border-color .2s,color .2s}
+#drop-zone:hover,#drop-zone.drag{border-color:var(--accent);color:var(--accent)}
+#drop-zone input{display:none}
+
+.cam-controls{padding:10px 12px 12px;display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line)}
+.btn-row{display:flex;gap:8px}
+canvas{display:none}
+
+/* buttons */
+button{flex:1;padding:9px 12px;border:1px solid var(--line);border-radius:var(--r);
+  background:var(--bg3);color:var(--text);font:12px var(--mono);cursor:pointer;
+  transition:border-color .15s,color .15s,opacity .15s;white-space:nowrap}
+button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+button:disabled{opacity:.3;cursor:default}
+button.primary{background:var(--accent);border-color:var(--accent);color:#000;font-weight:700}
+button.primary:hover:not(:disabled){opacity:.85;color:#000}
+button.danger:hover{border-color:var(--red);color:var(--red)}
+
+/* results panel */
+#panel-results{display:flex;flex-direction:column;overflow:hidden}
+.panel-head{padding:14px 16px 10px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:10px}
+.panel-head h1{font-family:var(--head);font-size:20px;font-weight:800;letter-spacing:-.5px}
+.panel-head span{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+
+#status{padding:8px 16px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--line);
+  min-height:34px;display:flex;align-items:center;gap:8px}
+#status.ok{color:var(--accent)}
+#status.err{color:var(--red)}
+#prog{height:2px;flex:1;background:var(--line);border-radius:1px;overflow:hidden;display:none}
+#prog-bar{height:100%;background:var(--accent);width:0;transition:width .1s}
+
+#result-wrap{border-bottom:1px solid var(--line)}
+#result-label{padding:8px 16px 4px;font-size:10px;color:var(--muted);letter-spacing:1.5px;
+  text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+#result{padding:8px 16px 12px;font-size:12px;line-height:1.7;white-space:pre-wrap;
+  word-break:break-word;color:#bbb;max-height:28vh;min-height:60px;overflow-y:auto}
+#result::-webkit-scrollbar,#history::-webkit-scrollbar{width:4px}
+#result::-webkit-scrollbar-thumb,#history::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
+#copy-btn{font-size:10px;padding:3px 9px;flex:none}
+
+.hist-head{padding:10px 16px 6px;font-size:10px;color:var(--muted);letter-spacing:1.5px;
+  text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
+#clear-btn{font-size:10px;padding:3px 9px;flex:none}
+#history{flex:1;overflow-y:auto;padding:10px 12px 12px}
+
+.item{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;background:var(--bg2)}
+.item:hover{border-color:#333}
+.item-meta{font-size:10px;color:var(--muted);margin-bottom:5px;display:flex;gap:8px}
+.item-badge{background:var(--accent);color:#000;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700}
+.item-text{font-size:11px;color:#999;margin-bottom:8px;line-height:1.5}
+.item-btns{display:flex;gap:6px}
+.item-btns button{flex:none;padding:4px 10px;font-size:10px}
+.empty{text-align:center;color:var(--muted);padding:40px 0;font-size:12px}
+
+/* toast */
+#toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--bg3);border:1px solid var(--accent);color:var(--accent);
+  padding:8px 16px;border-radius:20px;font-size:11px;opacity:0;
+  transition:opacity .2s,transform .2s;pointer-events:none;z-index:200}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* mobile */
+@media(max-width:640px){
+  #app{grid-template-columns:1fr}
+  #tabbar{display:grid}
+  #panel-camera,#panel-results{position:fixed;inset:0;bottom:56px;overflow:hidden;display:flex}
+  #panel-camera.tab-hidden,#panel-results.tab-hidden{display:none}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="panel-camera">
+    <div id="video-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <div id="scan-line"></div>
+      <div id="no-camera">
+        <svg viewBox="0 0 24 24" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Camera inactive
+      </div>
+    </div>
+    <canvas id="canvas"></canvas>
+    <div class="cam-controls">
+      <label id="drop-zone">
+        <input type="file" id="file-input" accept="image/*">
+        📎 Upload image / drag & drop
+      </label>
+      <div class="btn-row">
+        <button id="btn-start">Start Camera</button>
+        <button id="btn-capture" class="primary" disabled>Scan</button>
+        <button id="btn-stop" disabled>Stop</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel-results">
+    <div class="panel-head">
+      <h1>Receipt Scanner</h1><span>PWA</span>
+    </div>
+    <div id="status">
+      <span id="status-text">Ready</span>
+      <div id="prog"><div id="prog-bar"></div></div>
+    </div>
+    <div id="result-wrap">
+      <div id="result-label"><span>Extracted Text</span><button id="copy-btn">Copy</button></div>
+      <div id="result">(waiting for scan)</div>
+    </div>
+    <div class="hist-head"><span>History</span><button id="clear-btn" class="danger">Clear All</button></div>
+    <div id="history"><div class="empty">No scans yet</div></div>
+  </section>
+</div>
+
+<nav id="tabbar">
+  <button id="tab-camera" class="active">
+    <svg viewBox="0 0 24 24" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    Camera
+  </button>
+  <button id="tab-results">
+    <svg viewBox="0 0 24 24" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    Results
+  </button>
+</nav>
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+const CFG = { lang:'eng+rus', psm:'6', facingMode:'environment' };
+
+const $  = id => document.getElementById(id);
+const video      = $('video'),    canvas   = $('canvas'),   ctx = canvas.getContext('2d');
+const noCamera   = $('no-camera'),scanLine = $('scan-line');
+const statusEl   = $('status'),   statusTx = $('status-text');
+const progEl     = $('prog'),     progBar  = $('prog-bar');
+const resultEl   = $('result'),   historyEl= $('history');
+const toastEl    = $('toast'),    fileInput= $('file-input'), dropZone = $('drop-zone');
+const btnStart   = $('btn-start'),btnCapture=$('btn-capture'),btnStop  = $('btn-stop');
+const btnCopy    = $('copy-btn'), btnClear = $('clear-btn');
+const tabCamera  = $('tab-camera'),tabResults=$('tab-results');
+const panelCam   = $('panel-camera'),panelRes=$('panel-results');
+
+let stream=null, db=null, worker=null;
+
+// helpers
+const setStatus = (msg,cls='') => { statusTx.textContent=msg; statusEl.className=cls; progEl.style.display='none'; };
+const setProgress= p => { progEl.style.display='block'; progBar.style.width=(p*100)+'%'; };
+const toast = msg => { toastEl.textContent=msg; toastEl.classList.add('show'); setTimeout(()=>toastEl.classList.remove('show'),2000); };
+
+// tabs (mobile)
+const showTab = name => {
+  const cam = name==='camera';
+  panelCam.classList.toggle('tab-hidden',!cam);
+  panelRes.classList.toggle('tab-hidden', cam);
+  tabCamera.classList.toggle('active', cam);
+  tabResults.classList.toggle('active',!cam);
+};
+tabCamera.addEventListener('click', ()=>showTab('camera'));
+tabResults.addEventListener('click',()=>showTab('results'));
+
+// IndexedDB
+function initDB() {
+  return new Promise((res,rej) => {
+    const req = indexedDB.open('ScannerDB',1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('scans',{keyPath:'id',autoIncrement:true});
+    req.onsuccess = () => { db=req.result; res(); };
+    req.onerror   = () => rej(req.error);
+  });
+}
+const tx     = m  => db.transaction('scans',m).objectStore('scans');
+const dbAdd  = r  => new Promise((s,e)=>{ const q=tx('readwrite').add(r); q.onsuccess=()=>s(q.result); q.onerror=e; });
+const dbGet  = id => new Promise(s=>{ const q=tx('readonly').get(id); q.onsuccess=()=>s(q.result); });
+const dbDel  = id => new Promise(s=>{ const q=tx('readwrite').delete(id); q.onsuccess=s; });
+const dbAll  = () => new Promise(s=>{ const q=tx('readonly').getAll(); q.onsuccess=()=>s(q.result.reverse()); });
+const dbClear= () => new Promise(s=>{ const q=tx('readwrite').clear(); q.onsuccess=s; });
+
+// OCR
+async function initOCR() {
+  if (worker) return;
+  setStatus('Loading OCR…');
+  worker = await Tesseract.createWorker(CFG.lang, 1, {
+    logger: m => m.status==='recognizing text' && setProgress(m.progress)
+  });
+  await worker.setParameters({tessedit_pageseg_mode:CFG.psm});
+  setStatus('Ready');
+}
+async function runOCR() {
+  const s = Math.min(1, 1400/canvas.width);
+  const t = document.createElement('canvas');
+  t.width=Math.round(canvas.width*s); t.height=Math.round(canvas.height*s);
+  t.getContext('2d').drawImage(canvas,0,0,t.width,t.height);
+  if (!worker) await initOCR();
+  return (await worker.recognize(t.toDataURL('image/jpeg',.92))).data.text.trim();
+}
+
+// QR / Barcode
+async function runQR() {
+  if ('BarcodeDetector' in window) {
+    try {
+      const sup = await BarcodeDetector.getSupportedFormats();
+      const fmts = ['qr_code','ean_13','ean_8','code_128','code_39','upc_a'].filter(f=>sup.includes(f));
+      if (fmts.length) {
+        const found = await new BarcodeDetector({formats:fmts}).detect(canvas);
+        if (found.length) return found.map(b=>`[${b.format}] ${b.rawValue}`).join('\n');
+      }
+    } catch(_) {}
+  }
+  for (const sc of [1,1.4,0.7]) {
+    const t=document.createElement('canvas');
+    t.width=Math.round(canvas.width*sc); t.height=Math.round(canvas.height*sc);
+    const tc=t.getContext('2d'); tc.drawImage(canvas,0,0,t.width,t.height);
+    const d=tc.getImageData(0,0,t.width,t.height);
+    const code=jsQR(d.data,t.width,t.height,{inversionAttempts:'attemptBoth'});
+    if (code) return `[qr_code] ${code.data}`;
+  }
+  return '';
+}
+
+// Camera
+async function startCamera() {
+  try {
+    stream?.getTracks().forEach(t=>t.stop());
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:CFG.facingMode,width:{ideal:1920},height:{ideal:1080}}
+    });
+    video.srcObject = stream;
+    await new Promise(res=>{ video.onloadedmetadata=res; });
+    canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+    noCamera.classList.add('hidden');
+    btnStart.disabled=true; btnCapture.disabled=false; btnStop.disabled=false;
+    setStatus('Camera active','ok');
+  } catch(e) { setStatus('Camera error: '+e.message,'err'); }
+}
+btnStart.addEventListener('click', startCamera);
+btnStop.addEventListener('click', () => {
+  stream?.getTracks().forEach(t=>t.stop());
+  stream=null; video.srcObject=null;
+  noCamera.classList.remove('hidden');
+  btnStart.disabled=false; btnCapture.disabled=btnStop.disabled=true;
+  setStatus('Camera stopped');
+});
+
+// File upload / drag-drop
+function loadImageFile(file) {
+  if (!file||!file.type.startsWith('image/')) return;
+  const r=new FileReader();
+  r.onload=e=>{ const img=new Image(); img.onload=()=>{ canvas.width=img.width; canvas.height=img.height; ctx.drawImage(img,0,0); processCapture(); }; img.src=e.target.result; };
+  r.readAsDataURL(file);
+}
+fileInput.addEventListener('change', e=>loadImageFile(e.target.files[0]));
+dropZone.addEventListener('dragover', e=>{ e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', ()=>dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e=>{ e.preventDefault(); dropZone.classList.remove('drag'); loadImageFile(e.dataTransfer.files[0]); });
+
+// Scan
+async function processCapture() {
+  btnCapture.disabled=true; scanLine.classList.add('active'); setStatus('Scanning…'); progEl.style.display='block';
+  const [ocrR,qrR] = await Promise.allSettled([runOCR(),runQR()]);
+  scanLine.classList.remove('active'); progEl.style.display='none';
+  let text = ocrR.status==='fulfilled' ? ocrR.value : '';
+  const qr = qrR.status==='fulfilled' ? qrR.value : '';
+  const hasQR = !!qr;
+  if (hasQR) text += (text?'\n\n── QR/Barcode ──\n':'')+qr;
+  resultEl.textContent = text||'(nothing detected)';
+  setStatus(hasQR?'Done · QR detected':'Done','ok');
+  await dbAdd({text,date:new Date().toISOString(),hasQR});
+  await renderHistory();
+  btnCapture.disabled=false;
+  if (window.innerWidth<=640) showTab('results');
+}
+btnCapture.addEventListener('click', ()=>{ if (!canvas.width) return setStatus('Camera not ready','err'); ctx.drawImage(video,0,0,canvas.width,canvas.height); processCapture(); });
+
+// Copy
+btnCopy.addEventListener('click', async ()=>{ const t=resultEl.textContent; if (!t||t.startsWith('(')) return; await navigator.clipboard.writeText(t).catch(()=>{}); toast('Copied!'); });
+
+// History
+const escHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+async function renderHistory() {
+  const items = await dbAll();
+  if (!items.length) { historyEl.innerHTML='<div class="empty">No scans yet</div>'; return; }
+  historyEl.innerHTML = items.map(i=>`
+    <div class="item">
+      <div class="item-meta"><span>${new Date(i.date).toLocaleString()}</span>${i.hasQR?'<span class="item-badge">QR</span>':''}</div>
+      <div class="item-text">${escHtml(i.text.slice(0,100))}${i.text.length>100?'…':''}</div>
+      <div class="item-btns">
+        <button onclick="viewItem(${i.id})">View</button>
+        <button class="danger" onclick="delItem(${i.id})">Delete</button>
+      </div>
+    </div>`).join('');
+}
+window.viewItem = async id => { const i=await dbGet(id); resultEl.textContent=i.text; if (window.innerWidth<=640) showTab('results'); };
+window.delItem  = async id => { if (!confirm('Delete?')) return; await dbDel(id); await renderHistory(); };
+btnClear.addEventListener('click', async ()=>{ if (!confirm('Clear all?')) return; await dbClear(); await renderHistory(); resultEl.textContent='(waiting for scan)'; toast('Cleared'); });
+
+// Service Worker
+if ('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+
+// Init
+initDB().then(renderHistory);
+initOCR();
+</script>
+</body>
+</html>
