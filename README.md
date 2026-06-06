@@ -108,3 +108,6 @@ Store    : scans
 | Service Worker | ✅ | ✅ | ✅ | ✅ |
 
 ---
+## 使用截图
+### 在终端输入：python -m http.server 8e8e
+<img width="759" height="66" alt="356c63932b7476cf3167dff7c5342bab" src="https://github.com/user-attachments/assets/70393707-54cf-438d-a307-c63fed78c0a3" />
