@@ -1,7 +1,7 @@
 {
-  "name": "Receipt Scanner",
-  "short_name": "Scanner",
-  "description": "Scan receipts and QR codes with OCR, stored locally",
+  "name": "Распознаватель текста",
+  "short_name": "Распознаватель",
+  "description": "Распознавание текста с помощью OCR, сохраняется локально",
   "start_url": "/index.html",
   "display": "standalone",
   "orientation": "any",

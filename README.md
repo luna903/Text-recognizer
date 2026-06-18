@@ -1,6 +1,6 @@
-# Receipt Scanner
+# Распознаватель текста
 
-Приложение PWA для сканирования чеков и QR-кодов с помощью технологии OCR.
+Приложение PWA для распознавания текста и QR-кодов с помощью технологии OCR.
 Работает в мобильных браузерах (Android / iOS Safari) и на настольных ПК.
 
 ## Используемые технологии
@@ -18,7 +18,7 @@
 ## Структура файлов
 
 ```
-receipt-scanner-pwa/
+text-scanner-pwa/
 ├── index.html      Основной файл приложения (однофайловая сборка без шагов компиляции)
 ├── sw.js           Service Worker — кэширование для офлайн-доступа
 ├── manifest.json   Манифест PWA (иконки, цветовая тема, режим отображения)
@@ -101,7 +101,7 @@ const CFG = {
 
 <img width="759" height="66" alt="356c63932b7476cf3167dff7c5342bab" src="https://github.com/user-attachments/assets/70393707-54cf-438d-a307-c63fed78c0a3" />
 
-### Переход на главную страницу Receipt Scanner：
+### Переход на главную страницу Text Scanner：
 
 <img width="2556" height="1470" alt="877469aecbe49069a8357e788c84454e" src="https://github.com/user-attachments/assets/7f4678e7-5d29-40e5-acde-077ddebb87ff" />
 

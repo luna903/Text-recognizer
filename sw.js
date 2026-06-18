@@ -1,7 +1,7 @@
 // sw.js — Service Worker
 // Cache shell + CDN libs for offline use
 
-const CACHE = 'receipt-scanner-v1';
+const CACHE = 'text-scanner-v1';
 const SHELL = [
   '/',
   '/index.html',
